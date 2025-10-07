@@ -21,4 +21,4 @@ export type Tone<
     subtone?: S;
 };
 
-export type ToneMap = Record<string, Tone<ColorResultData, any>>;
+export type ToneMap = Record<string, Tone<ColorResultData, Record<string, (data: ColorData) => ColorResultData>>>;
