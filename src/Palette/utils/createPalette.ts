@@ -1,50 +1,66 @@
-import { ColorData, InputModel, PaletteConfig, ToneMap } from "../model/types";
+import { ColorData, InputModel, ToneMap, ColorResultData, Tone } from "../model/types";
 
-type PaletteResult<
-    T extends ColorData,
-    I extends InputModel,
-    TM extends ToneMap<T>
-> = {
-    [K in keyof I]: T & ReturnType<TM[keyof TM]>;
-} & {
-    [K in keyof I as `${string & K}_${string & keyof TM}`]: ReturnType<TM[keyof TM]>;
-} & {
-    [K in keyof I as `${string & K}_${string & keyof TM}_${string & keyof TM[K extends keyof I ? keyof TM : never]}`]: Record<string, string>;
+type PaletteConfig<TM extends ToneMap> = {
+    base: Tone<ColorResultData, any>;
+    tones: TM;
 };
 
-export const createPalette = <
-    T extends ColorData,
+type UnionToIntersection<U> = (
+  U extends any ? (k: U) => void : never
+) extends (k: infer I) => void
+  ? I
+  : never;
+
+type SubtoneEntriesForTone<I extends InputModel, TN extends PropertyKey, S extends Record<string, unknown>> = {
+  [K in keyof I as `${string & K}_${string & keyof S}_${string & TN}`]: ColorResultData
+};
+
+type AllSubtoneEntries<I extends InputModel, TM extends ToneMap> = UnionToIntersection<{
+  [TN in keyof TM]: TM[TN] extends Tone<any, infer S>
+    ? SubtoneEntriesForTone<I, TN, S>
+    : {}
+}[keyof TM]>;
+
+type PaletteResult<I extends InputModel, TM extends ToneMap> = {
+    [K in keyof I]: I[K] & ReturnType<PaletteConfig<TM>["base"]>;
+} & {
+    [K in keyof I as `${string & K}_${string & keyof TM}`]: ReturnType<TM[keyof TM]>;
+} & AllSubtoneEntries<I, TM>;
+
+export function createPalette<
     I extends InputModel,
-    TM extends ToneMap<T>
+    TM extends ToneMap
 >(
     input: I,
-    config: PaletteConfig<T, TM>
-): PaletteResult<T, I, TM> => {
+    config: PaletteConfig<TM>
+): PaletteResult<I, TM> {
     const getBaseTone = config.base;
     const tones = config.tones;
 
-    const result: Record<string, Record<string, string>> = {};
+    const resultObj = {} as Record<string, ColorResultData>;
 
-    (Object.keys(input) as (keyof I)[]).forEach((key) => {
-        const colorData = input[key];
+    for (const key in input) {
+        const colorData = input[key] as ColorData;
 
-        result[String(key)] = {
+        resultObj[key] = {
             ...colorData,
-            ...getBaseTone(colorData as T),
+            ...getBaseTone(colorData),
         };
 
         for (const toneKey in tones) {
-            const toneFn = tones[toneKey];
-            result[`${String(key)}_${toneKey}`] = toneFn(colorData as T);
+            const getTone = tones[toneKey];
 
-            if (toneFn.subtone) {
-                for (const subtoneKey in toneFn.subtone) {
-                    const subtoneFn = toneFn.subtone[subtoneKey];
-                    result[`${String(key)}_${subtoneKey}_${toneKey}`] = subtoneFn(colorData as T);
+            resultObj[`${key}_${toneKey}`] = getTone(colorData);
+
+            if (getTone.subtone) {
+                for (const subtoneKey in getTone.subtone) {
+                    const getSubtone = getTone.subtone[subtoneKey];
+                    resultObj[`${key}_${subtoneKey}_${toneKey}`] = getSubtone(colorData);
                 }
             }
         }
-    });
+    }
 
-    return result as PaletteResult<T, I, TM>;
-};
+    return resultObj as PaletteResult<I, TM>;
+}
+

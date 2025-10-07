@@ -9,21 +9,16 @@ export type ColorData = {
 
 export type InputModel = Record<ColorsUnion, ColorData>;
 
+export type ColorResultData = Record<string, string>;
+
 export type ToneCallback<T extends ColorData, R> = (data: T) => R;
 
-export type SubtoneMap<T extends ColorData> = Record<
-    string,
-    ToneCallback<T, Record<string, string>>
->;
-
-export type Tone<T extends ColorData, R> = ToneCallback<T, R> & {
+export type Tone<
+    R,
+    S extends Record<string, (data: ColorData) => ColorResultData> = {}
+> = ((data: ColorData) => R) & {
     toneName?: string;
-    subtone?: SubtoneMap<T>;
+    subtone?: S;
 };
 
-export type ToneMap<T extends ColorData> = Record<string, Tone<T, any>>;
-
-export type PaletteConfig<T extends ColorData, TM extends ToneMap<T>> = {
-    base: Tone<T, any>;
-    tones: TM;
-};
+export type ToneMap = Record<string, Tone<ColorResultData, any>>;
